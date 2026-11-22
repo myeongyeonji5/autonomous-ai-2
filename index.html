@@ -1,0 +1,1580 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CW-Net Autonomous Driving Simulation</title>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    background: #9ec9e8;
+    color: white;
+}
+
+canvas {
+    display: block;
+}
+
+#hud {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    z-index: 10;
+    width: 285px;
+    max-height: calc(100vh - 30px);
+    overflow-y: auto;
+    padding: 17px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.94);
+    box-shadow: 0 5px 20px rgba(0,0,0,0.25);
+}
+
+#hud h2 {
+    margin: 0 0 15px;
+    font-size: 21px;
+}
+
+h3 {
+    margin: 12px 0 8px;
+    font-size: 14px;
+    color: #cbd5e1;
+}
+
+.info {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 12px 0;
+    font-size: 13px;
+}
+
+.label { color: #94a3b8; }
+
+#time, #speed, #selected, #status {
+    font-weight: bold;
+    text-align: right;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #475569;
+    margin: 14px 0;
+}
+
+.controls {
+    display: flex;
+    gap: 6px;
+    margin: 9px 0;
+}
+
+.controls button {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 4px;
+    border: none;
+    border-radius: 6px;
+    background: #2563eb;
+    color: white;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.controls button:hover { filter: brightness(1.2); }
+.controls button:active { transform: scale(0.96); }
+
+#topBtn { background: #059669; }
+#driverBtn { background: #7c3aed; }
+
+.legend {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    font-size: 12px;
+    color: #cbd5e1;
+}
+
+.color-box {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
+    border-radius: 2px;
+    vertical-align: middle;
+}
+
+.green { background: #22ff66; }
+.orange { background: #ff8c24; }
+
+/* AI 판단 패널 */
+
+#decisionPanel {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    z-index: 10;
+    width: 365px;
+    max-height: calc(100vh - 30px);
+    overflow-y: auto;
+    padding: 19px;
+    border-radius: 13px;
+    background: rgba(15, 23, 42, 0.95);
+    color: white;
+    box-shadow: 0 5px 25px rgba(0,0,0,0.3);
+}
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 15px;
+}
+
+.panel-header h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.ai-badge {
+    padding: 5px 9px;
+    border-radius: 20px;
+    background: #164e63;
+    color: #67e8f9;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+#decisionTitle {
+    font-size: 22px;
+    font-weight: bold;
+    color: #4ade80;
+    margin-bottom: 5px;
+}
+
+.panel-subtitle {
+    color: #94a3b8;
+    font-size: 11px;
+    margin-bottom: 14px;
+}
+
+.panel-section {
+    margin-top: 15px;
+}
+
+.panel-section h3 {
+    color: #cbd5e1;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+#explanationText {
+    padding: 12px;
+    border-radius: 8px;
+    background: rgba(51, 65, 85, 0.75);
+    border-left: 3px solid #38bdf8;
+    color: #f1f5f9;
+    font-size: 12px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+.risk-row {
+    margin: 12px 0;
+}
+
+.risk-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+
+.risk-value {
+    font-weight: bold;
+    color: #fbbf24;
+}
+
+.risk-track {
+    width: 100%;
+    height: 8px;
+    background: #334155;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.risk-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: 10px;
+    background: #f59e0b;
+    transition: width 0.15s;
+}
+
+.risk-fill.low { background: #22c55e; }
+.risk-fill.medium { background: #eab308; }
+.risk-fill.high { background: #ef4444; }
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+}
+
+.metric-card {
+    padding: 11px;
+    border-radius: 8px;
+    background: rgba(51, 65, 85, 0.7);
+}
+
+.metric-label {
+    color: #94a3b8;
+    font-size: 10px;
+    margin-bottom: 6px;
+}
+
+.metric-value {
+    font-size: 17px;
+    font-weight: bold;
+}
+
+#trafficInfo {
+    color: #cbd5e1;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.candidate-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.candidate-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 9px 10px;
+    border-radius: 7px;
+    background: rgba(51, 65, 85, 0.65);
+    font-size: 12px;
+}
+
+.candidate-item.active {
+    border: 1px solid #22c55e;
+    background: rgba(20, 83, 45, 0.55);
+}
+
+.candidate-status {
+    color: #94a3b8;
+    font-size: 10px;
+}
+
+.candidate-item.active .candidate-status {
+    color: #4ade80;
+    font-weight: bold;
+}
+
+.small-note {
+    color: #94a3b8;
+    font-size: 10px;
+    line-height: 1.5;
+    margin-top: 10px;
+}
+
+#loading {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15,23,42,0.9);
+    color: white;
+    font-size: 20px;
+    text-align: center;
+    padding: 20px;
+}
+
+#loading.hidden { display: none; }
+
+@media (max-width: 850px) {
+    #hud {
+        width: 235px;
+        padding: 12px;
+        top: 8px;
+        left: 8px;
+        max-height: 45vh;
+    }
+
+    #decisionPanel {
+        width: 290px;
+        right: 8px;
+        top: 8px;
+        padding: 13px;
+        max-height: 55vh;
+    }
+}
+
+@media (max-width: 560px) {
+    #hud {
+        width: 190px;
+        font-size: 11px;
+    }
+
+    #decisionPanel {
+        width: 230px;
+        top: auto;
+        bottom: 8px;
+        max-height: 48vh;
+    }
+
+    .panel-header h2 { font-size: 15px; }
+    #decisionTitle { font-size: 18px; }
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">CW-Net 시뮬레이션 로딩 중...</div>
+
+<!-- 왼쪽 기본 HUD -->
+<div id="hud">
+    <h2>CW-Net Simulation</h2>
+
+    <div class="info">
+        <span class="label">Simulation Time</span>
+        <span id="time">0.0 s</span>
+    </div>
+
+    <div class="info">
+        <span class="label">Vehicle Speed</span>
+        <span id="speed">0 km/h</span>
+    </div>
+
+    <div class="info">
+        <span class="label">Selected Path</span>
+        <span id="selected">-</span>
+    </div>
+
+    <div class="info">
+        <span class="label">Status</span>
+        <span id="status">Simulation Ready</span>
+    </div>
+
+    <hr>
+
+    <h3>Simulation Control</h3>
+    <div class="controls">
+        <button id="playBtn">재생</button>
+        <button id="pauseBtn">일시정지</button>
+        <button id="resetBtn">처음부터</button>
+    </div>
+
+    <hr>
+
+    <h3>Camera View</h3>
+    <div class="controls">
+        <button id="followBtn">추적 시점</button>
+        <button id="topBtn">탑뷰</button>
+        <button id="driverBtn">운전자 시점</button>
+    </div>
+
+    <hr>
+
+    <div class="legend">
+        <div>
+            <span class="color-box green"></span>
+            Selected Trajectory
+        </div>
+        <div>
+            <span class="color-box orange"></span>
+            Alternative Trajectory
+        </div>
+    </div>
+</div>
+
+<!-- 오른쪽 AI 판단 근거 패널 -->
+<div id="decisionPanel">
+
+    <div class="panel-header">
+        <h2>AI Driving Decision</h2>
+        <span class="ai-badge">CW-NET</span>
+    </div>
+
+    <div id="decisionTitle">분석 대기 중</div>
+    <div class="panel-subtitle">
+        현재 프레임의 AI 경로 선택 결과
+    </div>
+
+    <div class="panel-section">
+        <h3>WHY DID AI CHOOSE THIS PATH?</h3>
+        <div id="explanationText">
+            시뮬레이션 데이터를 불러오는 중입니다.
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="panel-section">
+        <h3>Neural Concept Prediction</h3>
+
+        <div class="risk-row">
+            <div class="risk-top">
+                <span>충돌 위험</span>
+                <span class="risk-value" id="collisionValue">-</span>
+            </div>
+            <div class="risk-track">
+                <div class="risk-fill" id="collisionBar"></div>
+            </div>
+        </div>
+
+        <div class="risk-row">
+            <div class="risk-top">
+                <span>근접 객체</span>
+                <span class="risk-value" id="closeValue">-</span>
+            </div>
+            <div class="risk-track">
+                <div class="risk-fill" id="closeBar"></div>
+            </div>
+        </div>
+
+        <div class="risk-row">
+            <div class="risk-top">
+                <span>보행자 위험</span>
+                <span class="risk-value" id="pedestrianValue">-</span>
+            </div>
+            <div class="risk-track">
+                <div class="risk-fill" id="pedestrianBar"></div>
+            </div>
+        </div>
+
+        <div class="risk-row">
+            <div class="risk-top">
+                <span>자전거 위험</span>
+                <span class="risk-value" id="bicycleValue">-</span>
+            </div>
+            <div class="risk-track">
+                <div class="risk-fill" id="bicycleBar"></div>
+            </div>
+        </div>
+
+        <div class="small-note">
+            ※ 위험 수치는 신경망의 예측 점수이며,
+            실제 사고 발생 확률을 의미하지 않습니다.
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="panel-section">
+        <h3>Driving Analysis</h3>
+
+        <div class="metric-grid">
+            <div class="metric-card">
+                <div class="metric-label">최소 예측 거리</div>
+                <div class="metric-value" id="minimumDistance">-</div>
+            </div>
+
+            <div class="metric-card">
+                <div class="metric-label">신경망 감점</div>
+                <div class="metric-value" id="neuralPenalty">-</div>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>Surrounding Objects</h3>
+            <div id="trafficInfo">주변 객체 분석 중...</div>
+        </div>
+    </div>
+
+    <hr>
+
+    <div class="panel-section">
+        <h3>Candidate Trajectories</h3>
+        <div class="candidate-list" id="candidateList">
+            <div class="candidate-item">경로 데이터 대기 중</div>
+        </div>
+        <div class="small-note">
+            초록색은 선택된 경로, 주황색은 대안 경로입니다.
+            개별 경로 점수는 원본 데이터에 없어 표시하지 않습니다.
+        </div>
+    </div>
+
+</div>
+
+<script type="module">
+
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// =====================================
+// 1. 기본 설정
+// =====================================
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xaecce0);
+scene.fog = new THREE.Fog(0xaecce0, 120, 300);
+
+const camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+);
+
+camera.position.set(0, 8, 15);
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+
+document.body.appendChild(renderer.domElement);
+
+// =====================================
+// 2. 조명
+// =====================================
+
+scene.add(
+    new THREE.HemisphereLight(0xffffff, 0x667788, 2)
+);
+
+const sunlight = new THREE.DirectionalLight(0xffffff, 2.5);
+
+sunlight.position.set(-20, 40, 20);
+sunlight.castShadow = true;
+sunlight.shadow.mapSize.set(2048, 2048);
+sunlight.shadow.camera.left = -100;
+sunlight.shadow.camera.right = 100;
+sunlight.shadow.camera.top = 100;
+sunlight.shadow.camera.bottom = -100;
+
+scene.add(sunlight);
+
+// =====================================
+// 3. 모델 로더
+// =====================================
+
+const loader = new GLTFLoader();
+
+const MODEL_PATHS = {
+    ego: './models/gt3.glb',
+    car: './models/aroundcar.glb',
+    bicycle: './models/bike.glb',
+    pedestrian: './models/grandmother.glb'
+};
+
+const MODEL_ROTATIONS = {
+    ego: Math.PI,
+    car: Math.PI,
+    bicycle: Math.PI,
+    pedestrian: 0
+};
+
+function prepareModel(model) {
+    model.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
+}
+
+function loadGLB(path) {
+    return new Promise((resolve, reject) => {
+        loader.load(
+            path,
+            gltf => resolve(gltf.scene),
+            undefined,
+            reject
+        );
+    });
+}
+
+// =====================================
+// 4. 절차적 배경
+// =====================================
+
+function createRoad() {
+
+    const road = new THREE.Mesh(
+        new THREE.PlaneGeometry(7.5, 2000),
+        new THREE.MeshStandardMaterial({
+            color: 0x30343b,
+            roughness: 1
+        })
+    );
+
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(0, -0.05, -950);
+    road.receiveShadow = true;
+    scene.add(road);
+
+    // 중앙 차선
+    for (let z = 0; z > -2000; z -= 12) {
+        const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.02, 6),
+            new THREE.MeshStandardMaterial({
+                color: 0xffffff
+            })
+        );
+
+        line.position.set(0, 0.02, z);
+        scene.add(line);
+    }
+
+    // 도로 가장자리
+    [-3.5, 3.5].forEach(x => {
+        const line = new THREE.Mesh(
+            new THREE.BoxGeometry(0.12, 0.03, 2000),
+            new THREE.MeshStandardMaterial({
+                color: 0xffffff
+            })
+        );
+
+        line.position.set(x, 0.02, -950);
+        scene.add(line);
+    });
+
+    // 보도
+    [-5, 5].forEach(x => {
+        const sidewalk = new THREE.Mesh(
+            new THREE.BoxGeometry(2.5, 0.2, 2000),
+            new THREE.MeshStandardMaterial({
+                color: 0x888888
+            })
+        );
+
+        sidewalk.position.set(x, 0.05, -950);
+        sidewalk.receiveShadow = true;
+        scene.add(sidewalk);
+    });
+
+    // 주변 지면
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(100, 2000),
+        new THREE.MeshStandardMaterial({
+            color: 0x477344,
+            roughness: 1
+        })
+    );
+
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(0, -0.08, -950);
+    ground.receiveShadow = true;
+    scene.add(ground);
+}
+
+function createBuildings() {
+
+    for (let z = -30; z > -500; z -= 35) {
+
+        [-12, 12].forEach(x => {
+
+            const height = 12 + Math.random() * 25;
+
+            const building = new THREE.Mesh(
+                new THREE.BoxGeometry(9, height, 15),
+                new THREE.MeshStandardMaterial({
+                    color: 0x657b91,
+                    roughness: 0.9
+                })
+            );
+
+            building.position.set(
+                x,
+                height / 2 - 0.08,
+                z
+            );
+
+            building.castShadow = true;
+            building.receiveShadow = true;
+
+            scene.add(building);
+        });
+    }
+}
+
+function createStreetLights() {
+
+    for (let z = 0; z > -500; z -= 30) {
+
+        [-5.5, 5.5].forEach(x => {
+
+            const pole = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.08, 0.12, 6),
+                new THREE.MeshStandardMaterial({
+                    color: 0x444444
+                })
+            );
+
+            pole.position.set(x, 2.92, z);
+            scene.add(pole);
+
+            const lamp = new THREE.Mesh(
+                new THREE.BoxGeometry(0.8, 0.12, 0.3),
+                new THREE.MeshStandardMaterial({
+                    color: 0xffeeaa,
+                    emissive: 0x665522
+                })
+            );
+
+            lamp.position.set(
+                x + (x < 0 ? 0.35 : -0.35),
+                5.92,
+                z
+            );
+
+            scene.add(lamp);
+        });
+    }
+}
+
+function createTrees() {
+
+    for (let z = -15; z > -500; z -= 20) {
+
+        [-8, 8].forEach(x => {
+
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.3, 2),
+                new THREE.MeshStandardMaterial({
+                    color: 0x79512f
+                })
+            );
+
+            trunk.position.set(x, 0.92, z);
+            scene.add(trunk);
+
+            const leaves = new THREE.Mesh(
+                new THREE.SphereGeometry(1.5, 12, 10),
+                new THREE.MeshStandardMaterial({
+                    color: 0x267a43
+                })
+            );
+
+            leaves.position.set(x, 2.92, z);
+            scene.add(leaves);
+        });
+    }
+}
+
+// =====================================
+// 5. 자율주행 자동차
+// =====================================
+
+const egoCar = new THREE.Group();
+scene.add(egoCar);
+
+async function loadEgoCar() {
+
+    const model = await loadGLB(MODEL_PATHS.ego);
+
+    model.rotation.y = MODEL_ROTATIONS.ego;
+    prepareModel(model);
+
+    egoCar.add(model);
+
+    console.log('GT3 모델 로딩 완료');
+}
+
+// =====================================
+// 6. 주변 객체
+// =====================================
+// =====================================
+// 6. 주변 객체 및 보행자
+// =====================================
+
+const trafficObjects = new Map();
+const modelCache = new Map();
+
+// 보행자 도형 생성
+function createPedestrianModel() {
+    const person = new THREE.Group();
+
+    const red = new THREE.MeshStandardMaterial({
+        color: 0xff3333,
+        roughness: 0.8
+    });
+
+    // 머리
+    const head = new THREE.Mesh(
+        new THREE.SphereGeometry(0.22, 16, 16),
+        red
+    );
+    head.position.y = 1.65;
+    person.add(head);
+
+    // 몸통
+    const body = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2, 0.28, 0.75, 16),
+        red
+    );
+    body.position.y = 1.05;
+    person.add(body);
+
+    // 팔
+    for (const side of [-1, 1]) {
+        const arm = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.07, 0.07, 0.65, 10),
+            red
+        );
+
+        arm.position.set(side * 0.32, 1.15, 0);
+        arm.rotation.z = -side * Math.PI / 5;
+        person.add(arm);
+    }
+
+    // 다리
+    for (const side of [-1, 1]) {
+        const leg = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.09, 0.09, 0.7, 10),
+            red
+        );
+
+        leg.position.set(side * 0.13, 0.38, 0);
+        person.add(leg);
+    }
+
+    person.traverse(child => {
+        if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+        }
+    });
+
+    return person;
+}
+
+// 주변 모델 불러오기
+async function getModelPrototype(type) {
+    if (!modelCache.has(type)) {
+        const path =
+            type === 'bicycle'
+                ? MODEL_PATHS.bicycle
+                : MODEL_PATHS.car;
+
+        const promise = loadGLB(path).then(model => {
+            prepareModel(model);
+            return model;
+        });
+
+        modelCache.set(type, promise);
+    }
+
+    return modelCache.get(type);
+}
+
+// 주변 객체 생성
+async function getTrafficObject(obj) {
+    if (trafficObjects.has(obj.id)) {
+        return trafficObjects.get(obj.id);
+    }
+
+    const group = new THREE.Group();
+    group.userData.type = obj.type;
+
+    group.position.set(obj.y, 0, -obj.x);
+    scene.add(group);
+
+    trafficObjects.set(obj.id, group);
+
+    try {
+        if (obj.type === 'pedestrian') {
+            group.add(createPedestrianModel());
+            console.log('3D 보행자 도형 생성 완료');
+        } else {
+            const prototype = await getModelPrototype(obj.type);
+            const model = prototype.clone(true);
+
+            model.rotation.y = MODEL_ROTATIONS[obj.type];
+            prepareModel(model);
+
+            group.add(model);
+        }
+    } catch (error) {
+        console.error('주변 모델 로딩 실패:', obj.type, error);
+    }
+
+    return group;
+}
+
+// 주변 객체 위치 업데이트
+function updateTraffic(traffic) {
+    for (const obj of traffic) {
+        let group = trafficObjects.get(obj.id);
+
+        if (!group) {
+            getTrafficObject(obj);
+            continue;
+        }
+
+        group.position.set(obj.y, 0, -obj.x);
+
+        if (obj.type === 'pedestrian') {
+            group.rotation.y =
+                obj.direction < 0 ? 0 : Math.PI;
+        }
+    }
+}
+// =====================================
+// 7. 경로 시각화
+// =====================================
+
+const pathObjects = new Map();
+let currentPathFrame = -1;
+
+function clearPaths() {
+
+    for (const object of pathObjects.values()) {
+
+        scene.remove(object.line);
+
+        object.line.geometry.dispose();
+        object.line.material.dispose();
+    }
+
+    pathObjects.clear();
+}
+
+function updatePaths(frame, frameIndex) {
+
+    if (currentPathFrame === frameIndex) return;
+
+    currentPathFrame = frameIndex;
+
+    clearPaths();
+
+    if (!frame.trajectories) return;
+
+    for (const [name, points] of Object.entries(frame.trajectories)) {
+
+        if (!points || points.length < 2) continue;
+
+        const positions = points.map(point =>
+            new THREE.Vector3(
+                point.y,
+                0.16,
+                -point.x
+            )
+        );
+
+        const geometry = new THREE.BufferGeometry()
+            .setFromPoints(positions);
+
+        const isSelected = name === frame.selected_path;
+
+        const material = new THREE.LineBasicMaterial({
+            color: isSelected ? 0x00ff66 : 0xffa500,
+            transparent: true,
+            opacity: isSelected ? 1 : 0.35
+        });
+
+        const line = new THREE.Line(geometry, material);
+
+        scene.add(line);
+
+        pathObjects.set(name, {
+            line,
+            anchorX: frame.ego.x,
+            anchorY: frame.ego.y
+        });
+    }
+}
+
+function movePathsWithCar(ego) {
+
+    for (const object of pathObjects.values()) {
+
+        object.line.position.set(
+            ego.y - object.anchorY,
+            0,
+            -(ego.x - object.anchorX)
+        );
+    }
+}
+
+// =====================================
+// 8. JSON 데이터
+// =====================================
+
+let frames = [];
+
+let playing = true;
+let playbackPosition = 0;
+let lastAnimationTime = 0;
+
+const frameInterval = 100;
+
+async function loadSimulationData() {
+
+    const response = await fetch(
+        './simulation_data.json',
+        { cache: 'no-store' }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            'simulation_data.json을 찾을 수 없습니다.'
+        );
+    }
+
+    const data = await response.json();
+
+    frames = data.frames || data;
+
+    if (!Array.isArray(frames) || frames.length === 0) {
+        throw new Error('프레임 데이터가 비어 있습니다.');
+    }
+
+    console.log('시뮬레이션 프레임:', frames.length);
+
+    updateSimulation(0);
+}
+
+// =====================================
+// 9. 프레임 보간
+// =====================================
+
+function interpolateValue(a, b, t) {
+    return a + (b - a) * t;
+}
+
+function interpolateFrame(index, alpha) {
+
+    const current = frames[index];
+
+    if (index >= frames.length - 1) {
+        return current;
+    }
+
+    const next = frames[index + 1];
+
+    const ego = {
+        x: interpolateValue(
+            current.ego.x,
+            next.ego.x,
+            alpha
+        ),
+
+        y: interpolateValue(
+            current.ego.y,
+            next.ego.y,
+            alpha
+        ),
+
+        speed: interpolateValue(
+            current.ego.speed,
+            next.ego.speed,
+            alpha
+        )
+    };
+
+    const traffic = current.traffic.map(obj => {
+
+        const nextObj = next.traffic.find(
+            item => item.id === obj.id
+        );
+
+        if (!nextObj) return obj;
+
+        return {
+            ...obj,
+
+            x: interpolateValue(
+                obj.x,
+                nextObj.x,
+                alpha
+            ),
+
+            y: interpolateValue(
+                obj.y,
+                nextObj.y,
+                alpha
+            )
+        };
+    });
+
+    return {
+        ...current,
+        ego,
+        traffic
+    };
+}
+
+// =====================================
+// 10. 기본 HUD
+// =====================================
+
+function setStatus(message) {
+    document.getElementById('status').textContent = message;
+}
+
+const PATH_LABELS = {
+    keep_speed: '속도 유지',
+    slow_down: '감속',
+    change_lane: '차선 변경',
+    stop: '정지'
+};
+
+function updateHUD(frame) {
+
+    document.getElementById('time').textContent =
+        `${frame.time.toFixed(1)} s`;
+
+    document.getElementById('speed').textContent =
+        `${(frame.ego.speed * 3.6).toFixed(1)} km/h`;
+
+    document.getElementById('selected').textContent =
+        PATH_LABELS[frame.selected_path] || frame.selected_path;
+
+    setStatus(
+        frame.selected_path === 'stop'
+            ? '안전 경로 없음 - 정지'
+            : '주행 중'
+    );
+}
+
+// =====================================
+// 11. AI 판단 근거 패널
+// =====================================
+
+function updateRiskBar(value, valueId, barId) {
+
+    const number = Number(value);
+
+    const valueElement = document.getElementById(valueId);
+    const barElement = document.getElementById(barId);
+
+    if (!Number.isFinite(number)) {
+        valueElement.textContent = '데이터 없음';
+        barElement.style.width = '0%';
+        barElement.className = 'risk-fill';
+        return;
+    }
+
+    const percent = Math.max(
+        0,
+        Math.min(100, number * 100)
+    );
+
+    valueElement.textContent =
+        `${percent.toFixed(1)}%`;
+
+    barElement.style.width = `${percent}%`;
+
+    barElement.className = 'risk-fill';
+
+    if (percent >= 70) {
+        barElement.classList.add('high');
+    } else if (percent >= 40) {
+        barElement.classList.add('medium');
+    } else {
+        barElement.classList.add('low');
+    }
+}
+
+function updateCandidateList(frame) {
+
+    const container = document.getElementById('candidateList');
+
+    const candidates = [
+        ['keep_speed', '속도 유지'],
+        ['slow_down', '감속'],
+        ['change_lane', '차선 변경'],
+        ['stop', '정지']
+    ];
+
+    container.innerHTML = '';
+
+    for (const [key, label] of candidates) {
+
+        const exists =
+            frame.trajectories &&
+            Array.isArray(frame.trajectories[key]);
+
+        const selected = frame.selected_path === key;
+
+        if (!exists) continue;
+
+        const item = document.createElement('div');
+
+        item.className =
+            'candidate-item' + (selected ? ' active' : '');
+
+        const name = document.createElement('span');
+        name.textContent = label;
+
+        const status = document.createElement('span');
+
+        status.className = 'candidate-status';
+
+        status.textContent =
+            selected ? '현재 선택됨' : '대안 경로';
+
+        item.appendChild(name);
+        item.appendChild(status);
+
+        container.appendChild(item);
+    }
+
+    if (container.children.length === 0) {
+        container.textContent = '후보 경로 데이터가 없습니다.';
+    }
+}
+
+function updateTrafficInfo(frame) {
+
+    const container = document.getElementById('trafficInfo');
+
+    if (!Array.isArray(frame.traffic) || frame.traffic.length === 0) {
+        container.textContent = '주변 객체가 감지되지 않았습니다.';
+        return;
+    }
+
+    const typeLabels = {
+        car: '자동차',
+        bicycle: '자전거',
+        pedestrian: '보행자'
+    };
+
+    const aheadObjects = frame.traffic
+        .map(obj => ({
+            ...obj,
+            gap: obj.x - frame.ego.x
+        }))
+        .filter(obj => obj.gap > 0)
+        .sort((a, b) => a.gap - b.gap);
+
+    const nearest = aheadObjects[0];
+
+    if (!nearest) {
+        container.textContent =
+            `주변 객체 ${frame.traffic.length}개 감지 · 전방 객체 없음`;
+        return;
+    }
+
+    container.textContent =
+        `주변 객체 ${frame.traffic.length}개 감지 · ` +
+        `가장 가까운 전방 객체: ` +
+        `${typeLabels[nearest.type] || nearest.type} · ` +
+        `${nearest.gap.toFixed(1)}m`;
+}
+
+function updateDecisionPanel(frame) {
+
+    const selected = frame.selected_path;
+
+    const label = PATH_LABELS[selected] || selected || '미선택';
+
+    document.getElementById('decisionTitle').textContent =
+        `${label} 경로 선택`;
+
+    // JSON에 저장된 실제 설명 사용
+    const explanationElement =
+        document.getElementById('explanationText');
+
+    if (
+        typeof frame.explanation === 'string' &&
+        frame.explanation.trim().length > 0
+    ) {
+        explanationElement.textContent = frame.explanation;
+    } else {
+        explanationElement.textContent =
+            '이 프레임에는 AI 판단 설명 데이터가 저장되어 있지 않습니다.';
+    }
+
+    // 신경망 예측값
+    const risk = frame.risk || {};
+
+    updateRiskBar(
+        risk.collision_risk,
+        'collisionValue',
+        'collisionBar'
+    );
+
+    updateRiskBar(
+        risk.close_object,
+        'closeValue',
+        'closeBar'
+    );
+
+    updateRiskBar(
+        risk.pedestrian_conflict,
+        'pedestrianValue',
+        'pedestrianBar'
+    );
+
+    updateRiskBar(
+        risk.bicycle_conflict,
+        'bicycleValue',
+        'bicycleBar'
+    );
+
+    // 최소 거리
+    const distance = Number(frame.minimum_distance);
+
+    document.getElementById('minimumDistance').textContent =
+        Number.isFinite(distance)
+            ? `${distance.toFixed(2)} m`
+            : '데이터 없음';
+
+    // 신경망 감점
+    const penalty = Number(frame.neural_penalty);
+
+    document.getElementById('neuralPenalty').textContent =
+        Number.isFinite(penalty)
+            ? `${penalty.toFixed(2)} 점`
+            : '데이터 없음';
+
+    updateTrafficInfo(frame);
+    updateCandidateList(frame);
+}
+
+// =====================================
+// 12. 시뮬레이션 업데이트
+// =====================================
+
+function updateSimulation(index, alpha = 0) {
+
+    const frame = interpolateFrame(index, alpha);
+
+    egoCar.position.set(
+        frame.ego.y,
+        0,
+        -frame.ego.x
+    );
+
+    updateTraffic(frame.traffic);
+
+    updatePaths(frames[index], index);
+
+    movePathsWithCar(frame.ego);
+
+    updateHUD(frame);
+
+    updateDecisionPanel(frame);
+
+    updateCamera(frame);
+}
+
+// =====================================
+// 13. 카메라
+// =====================================
+
+let cameraMode = 'follow';
+
+function updateCamera(frame) {
+
+    const carX = frame.ego.y;
+    const carZ = -frame.ego.x;
+
+    if (cameraMode === 'follow') {
+
+        const target = new THREE.Vector3(
+            carX,
+            7,
+            carZ + 13
+        );
+
+        camera.position.lerp(target, 0.08);
+
+        camera.lookAt(
+            carX,
+            0,
+            carZ - 8
+        );
+
+    } else if (cameraMode === 'top') {
+
+        camera.position.set(
+            carX,
+            30,
+            carZ + 2
+        );
+
+        camera.lookAt(
+            carX,
+            0,
+            carZ - 10
+        );
+
+    } else if (cameraMode === 'driver') {
+
+        camera.position.set(
+            carX,
+            2.1,
+            carZ - 0.5
+        );
+
+        camera.lookAt(
+            carX,
+            1.8,
+            carZ - 15
+        );
+    }
+}
+
+// =====================================
+// 14. 재생 제어
+// =====================================
+
+document.getElementById('playBtn').addEventListener('click', () => {
+
+    playing = true;
+    lastAnimationTime = 0;
+});
+
+document.getElementById('pauseBtn').addEventListener('click', () => {
+
+    playing = false;
+});
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+
+    playbackPosition = 0;
+    playing = true;
+    lastAnimationTime = 0;
+
+    updateSimulation(0);
+});
+
+// =====================================
+// 15. 카메라 제어
+// =====================================
+
+document.getElementById('followBtn').addEventListener('click', () => {
+    cameraMode = 'follow';
+});
+
+document.getElementById('topBtn').addEventListener('click', () => {
+    cameraMode = 'top';
+});
+
+document.getElementById('driverBtn').addEventListener('click', () => {
+    cameraMode = 'driver';
+});
+
+// =====================================
+// 16. 애니메이션
+// =====================================
+
+function animate(timestamp = 0) {
+
+    requestAnimationFrame(animate);
+
+    if (playing && frames.length > 1) {
+
+        if (lastAnimationTime === 0) {
+            lastAnimationTime = timestamp;
+        }
+
+        const delta = timestamp - lastAnimationTime;
+
+        playbackPosition += delta / frameInterval;
+
+        lastAnimationTime = timestamp;
+
+        if (playbackPosition >= frames.length - 1) {
+            playbackPosition = 0;
+        }
+
+        const index = Math.floor(playbackPosition);
+
+        const alpha = playbackPosition - index;
+
+        updateSimulation(index, alpha);
+    }
+
+    renderer.render(scene, camera);
+}
+
+// =====================================
+// 17. 화면 크기 변경
+// =====================================
+
+window.addEventListener('resize', () => {
+
+    camera.aspect =
+        window.innerWidth / window.innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
+
+    renderer.setPixelRatio(
+        Math.min(window.devicePixelRatio, 2)
+    );
+});
+
+// =====================================
+// 18. 시작
+// =====================================
+
+async function start() {
+
+    try {
+
+        setStatus('모델 로딩 중...');
+
+        // 배경 생성
+        createRoad();
+        createBuildings();
+        createStreetLights();
+        createTrees();
+
+        // 자동차 모델 로딩
+        await loadEgoCar();
+
+        // 시뮬레이션 데이터 로딩
+        await loadSimulationData();
+
+        document.getElementById('loading')
+            .classList.add('hidden');
+
+        setStatus('시뮬레이션 실행 중');
+
+        animate();
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById('loading').textContent =
+            '로딩 오류: ' + error.message +
+            '\nF12를 눌러 콘솔을 확인하세요.';
+    }
+}
+
+start();
+
+</script>
+</body>
+</html>
